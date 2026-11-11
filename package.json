@@ -1,0 +1,29 @@
+{
+  "name": "russellcanwrite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Russell Can Write: a history, warfare and geography campaign that trains sentences and PEAL paragraphs.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "16.4.3",
+    "openai": "^6.48.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.3",
+    "typescript": "^5",
+    "vitest": "^4.1.10"
+  }
+}
