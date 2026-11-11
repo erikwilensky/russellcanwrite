@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { rcwSignedIn } from "@/lib/auth";
+import { rcwRole } from "@/lib/auth";
 import { analyse, type Gauges } from "@/lib/analyse";
 import { DISPATCHES } from "@/lib/content";
 import { costOf, MAX_OUTPUT_TOKENS, mayCall, readSpend, serial, withCall, worstCaseCall, writeSpend } from "@/lib/spend";
@@ -33,7 +33,8 @@ function clamp(n: unknown): number {
 }
 
 export async function POST(req: Request) {
-  if (!(await rcwSignedIn())) return NextResponse.json({ ok: false }, { status: 401 });
+  const role = await rcwRole();
+  if (!role) return NextResponse.json({ ok: false }, { status: 401 });
   const body = (await req.json().catch(() => ({}))) as { dispatchId?: unknown; text?: unknown };
   const text = typeof body.text === "string" ? body.text.slice(0, 4000) : "";
   const id = typeof body.dispatchId === "string" ? body.dispatchId : "";
@@ -46,7 +47,8 @@ export async function POST(req: Request) {
   const fallback = (note = "") =>
     NextResponse.json({ ok: true, source: "rules", gauges: rules.gauges, questions: [], praise: "", note });
   const key = process.env.OPENAI_API_KEY?.trim();
-  if (!key) return fallback();
+  // Guests (teacher preview) never reach the AI: the built-in rules mark their paragraphs.
+  if (!key || role !== "russell") return fallback();
   const model = process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini";
   // No automatic retries: every request that reaches OpenAI is counted against the cap.
   const client = new OpenAI({ apiKey: key, maxRetries: 0, timeout: 30_000 });

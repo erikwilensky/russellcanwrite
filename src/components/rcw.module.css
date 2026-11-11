@@ -795,3 +795,16 @@
   font-size: 18px;
   margin: 0 0 6px;
 }
+
+.guestBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px dashed var(--gold, #f2c14e);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}

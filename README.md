@@ -20,6 +20,7 @@ Copy `.env.example` to `.env` and fill it in.
 
 | Variable | Needed | What it does |
 | --- | --- | --- |
+| `RCW_GUEST_CODE` | no | A second code for a guest (e.g. Russell's teacher). Guests see every task open, start fresh, never see or change Russell's save, and never use the AI coach. Unset = no guest access. |
 | `AUTH_SECRET` | yes | Any long random string. Signs the login cookie. |
 | `RCW_ACCESS_CODE` | yes in production | The 8-digit login code. With none set, nobody can sign in. Changing it signs every device out. (Local dev default: `00000000`.) |
 | `DATA_DIR` | yes in production | A folder that survives redeploys. Progress is saved to `DATA_DIR/save.json`. Back this file up. Defaults to `./data`. |

@@ -15,10 +15,24 @@ function accessCode(): string {
   return process.env.NODE_ENV === "production" ? "" : "00000000";
 }
 
-function token(): string {
-  const secret = process.env.AUTH_SECRET || (process.env.NODE_ENV === "production" ? "" : "rcw-local-dev");
-  if (!secret) throw new Error("AUTH_SECRET is not set");
-  return createHmac("sha256", secret).update(`rcw:${accessCode()}`).digest("hex");
+/** Optional second code for a guest (e.g. Russell's teacher): every task open, nothing saved, no AI. */
+function guestCode(): string {
+  const set = process.env.RCW_GUEST_CODE?.trim();
+  if (set) return set;
+  return process.env.NODE_ENV === "production" ? "" : "11111111";
+}
+
+export type Role = "russell" | "guest";
+
+function secret(): string {
+  const v = process.env.AUTH_SECRET || (process.env.NODE_ENV === "production" ? "" : "rcw-local-dev");
+  if (!v) throw new Error("AUTH_SECRET is not set");
+  return v;
+}
+
+function token(role: Role = "russell"): string {
+  const material = role === "guest" ? `rcw-guest:${guestCode()}` : `rcw:${accessCode()}`;
+  return createHmac("sha256", secret()).update(material).digest("hex");
 }
 
 function same(a: string, b: string): boolean {
@@ -28,18 +42,35 @@ function same(a: string, b: string): boolean {
 }
 
 export function codeMatches(code: string): boolean {
-  const want = accessCode();
-  return want.length > 0 && same(code.replace(/\s+/g, ""), want);
+  return roleForCode(code) === "russell";
 }
 
-export function sessionToken(): string {
-  return token();
+/** Which role a typed code opens. Russell's code wins if the two are ever set the same. */
+export function roleForCode(code: string): Role | null {
+  const c = code.replace(/\s+/g, "");
+  const main = accessCode();
+  if (main && same(c, main)) return "russell";
+  const guest = guestCode();
+  if (guest && same(c, guest)) return "guest";
+  return null;
 }
 
-export async function rcwSignedIn(): Promise<boolean> {
+export function sessionToken(role: Role = "russell"): string {
+  return token(role);
+}
+
+export async function rcwRole(): Promise<Role | null> {
   const jar = await cookies();
   const v = jar.get(RCW_COOKIE)?.value;
-  return !!v && same(v, token());
+  if (!v) return null;
+  if (same(v, token("russell"))) return "russell";
+  if (guestCode() && same(v, token("guest"))) return "guest";
+  return null;
+}
+
+/** True only for Russell (the saving, AI-coached player). */
+export async function rcwSignedIn(): Promise<boolean> {
+  return (await rcwRole()) === "russell";
 }
 
 /* Ten wrong codes in ten minutes from one address locks that address out for the rest of the window. */

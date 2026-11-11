@@ -9,6 +9,7 @@ import {
   DRAFT_XP,
   levelFor,
   liveStreak,
+  guestState,
   normaliseState,
   recordAnswer,
   recordDraft,
@@ -56,8 +57,8 @@ function seed() {
   return Math.floor(Math.random() * 2 ** 31);
 }
 
-export function RcwGame({ initial }: { initial: unknown }) {
-  const [state, setState] = useState<SaveState>(() => normaliseState(initial));
+export function RcwGame({ initial, guest = false }: { initial: unknown; guest?: boolean }) {
+  const [state, setState] = useState<SaveState>(() => (guest ? guestState() : normaliseState(initial)));
   const [screen, setScreen] = useState<Screen>({ kind: "map", region: null });
   const [toast, setToast] = useState("");
   const [saveError, setSaveError] = useState(false);
@@ -67,6 +68,7 @@ export function RcwGame({ initial }: { initial: unknown }) {
   // Save to the server a moment after each change; flush at once if the page is closed.
   const pending = useRef<SaveState | null>(null);
   useEffect(() => {
+    if (guest) return; // a guest's play is never saved
     if (!loaded.current) {
       loaded.current = true;
       return;
@@ -79,17 +81,17 @@ export function RcwGame({ initial }: { initial: unknown }) {
         .then((r) => setSaveError(!r.ok))
         .catch(() => setSaveError(true));
     }, 1200);
-  }, [state]);
+  }, [state, guest]);
 
   useEffect(() => {
     const flush = () => {
-      if (!pending.current) return;
+      if (guest || !pending.current) return;
       navigator.sendBeacon("/api/save", new Blob([JSON.stringify({ state: pending.current })], { type: "application/json" }));
       pending.current = null;
     };
     window.addEventListener("pagehide", flush);
     return () => window.removeEventListener("pagehide", flush);
-  }, []);
+  }, [guest]);
 
   // Every new screen starts at the top.
   const screenKey = screen.kind === "map" ? `map:${screen.region ?? ""}` : screen.kind;
@@ -352,6 +354,17 @@ export function RcwGame({ initial }: { initial: unknown }) {
           </button>
         </div>
       </div>
+      {guest && (
+        <div className={`${s.wrap} ${s.guestBar}`} role="note">
+          <span>
+            <strong>Guest view.</strong> Every task is open to try. Nothing you do here is saved, Russell&apos;s progress is not shown,
+            and paragraphs are marked by the built-in rules (no AI).
+          </span>
+          <button type="button" className={s.ghost} onClick={signOut}>
+            Leave
+          </button>
+        </div>
+      )}
       {body}
       {saveError && (
         <p className={`${s.wrap} ${s.small} ${s.lose}`} role="status">

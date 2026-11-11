@@ -9,6 +9,8 @@ import type { Gauges } from "./analyse";
 export type Draft = { at: string; text: string; total: number; gauges: Gauges; words: number; runOnsPer100: number; claimFirst: boolean };
 
 export type SaveState = {
+  /** Guest (teacher preview): everything open, never saved. Never stored in Russell's save. */
+  guest?: boolean;
   v: 1;
   xp: number;
   /** stars 0-3 per region per skill */
@@ -40,7 +42,7 @@ export function normaliseState(raw: unknown): SaveState {
   const base = emptyState();
   if (!raw || typeof raw !== "object") return base;
   const r = raw as Partial<SaveState>;
-  return {
+  const out: SaveState = {
     ...base,
     ...r,
     v: 1,
@@ -50,6 +52,13 @@ export function normaliseState(raw: unknown): SaveState {
     days: r.days ?? {},
     streak: { ...base.streak, ...(r.streak ?? {}) },
   };
+  delete out.guest;
+  return out;
+}
+
+/** A fresh state for a guest: nothing played, every territory, siege and region open. */
+export function guestState(): SaveState {
+  return { ...emptyState(), guest: true };
 }
 
 /* ---------- days (Bangkok) ---------- */
@@ -180,6 +189,7 @@ export function territoriesWon(s: SaveState, region: RegionId): number {
 
 /** A territory opens once the one before it is won. */
 export function territoryOpen(s: SaveState, region: RegionId, skill: SkillId): boolean {
+  if (s.guest) return true;
   const i = SKILLS.findIndex((k) => k.id === skill);
   if (i <= 0) return true;
   return stars(s, region, SKILLS[i - 1]!.id) > 0;
@@ -188,11 +198,11 @@ export function territoryOpen(s: SaveState, region: RegionId, skill: SkillId): b
 export const SIEGE_NEEDS = 4;
 
 export function siegeOpen(s: SaveState, region: RegionId): boolean {
-  return territoriesWon(s, region) >= SIEGE_NEEDS;
+  return !!s.guest || territoriesWon(s, region) >= SIEGE_NEEDS;
 }
 
 export function regionOpen(s: SaveState, region: RegionId): boolean {
-  if (region === "boot") return true;
+  if (region === "boot" || s.guest) return true;
   return territoriesWon(s, "boot") >= 3;
 }
 

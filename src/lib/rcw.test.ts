@@ -158,3 +158,18 @@ describe("splice detection with noun subjects", () => {
     expect(fine.flags.some((f) => f.kind === "run-on")).toBe(false);
   });
 });
+
+describe("guest view", () => {
+  it("opens every region, territory and siege, and is never kept in a save", async () => {
+    const { guestState, normaliseState, regionOpen, siegeOpen, territoryOpen, emptyState } = await import("./state");
+    const { REGIONS, SKILLS } = await import("./regions");
+    const g = guestState();
+    for (const r of REGIONS) {
+      expect(regionOpen(g, r.id)).toBe(true);
+      expect(siegeOpen(g, r.id)).toBe(true);
+      for (const k of SKILLS) expect(territoryOpen(g, r.id, k.id)).toBe(true);
+    }
+    expect(normaliseState(g).guest).toBeUndefined();
+    expect(siegeOpen(emptyState(), "rome")).toBe(false);
+  });
+});
