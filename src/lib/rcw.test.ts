@@ -149,3 +149,12 @@ describe("progress rules", () => {
     expect(liveStreak(s, now)).toBe(1);
   });
 });
+
+describe("splice detection with noun subjects", () => {
+  it("flags ', the colours are' after a full clause but not after an opener", () => {
+    const runOn = analyse("The poster uses a dramatic image of a burning forest to make readers feel fear, the colours are dark and red.");
+    expect(runOn.flags.some((f) => f.kind === "run-on")).toBe(true);
+    const fine = analyse("In the top left of the poster, the colours are dark and red and they make the whole scene feel dangerous.");
+    expect(fine.flags.some((f) => f.kind === "run-on")).toBe(false);
+  });
+});

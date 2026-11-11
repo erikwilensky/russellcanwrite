@@ -1,5 +1,5 @@
 /**
- * Russell Can Write sign-in: one shared code (Erik's choice, 2026-11-11), no accounts.
+ * Russell Can Write sign-in: one shared code set in RCW_ACCESS_CODE, no accounts.
  * A correct code sets an httpOnly cookie holding an HMAC of the code, so changing
  * RCW_ACCESS_CODE signs every device out.
  */
@@ -8,12 +8,16 @@ import { cookies } from "next/headers";
 
 export const RCW_COOKIE = "rcw_session";
 
+/** The code is set on the server only. With none set, production accepts no code at all. */
 function accessCode(): string {
-  return (process.env.RCW_ACCESS_CODE ?? "67766776").trim();
+  const set = process.env.RCW_ACCESS_CODE?.trim();
+  if (set) return set;
+  return process.env.NODE_ENV === "production" ? "" : "00000000";
 }
 
 function token(): string {
-  const secret = process.env.AUTH_SECRET || "rcw-local-dev";
+  const secret = process.env.AUTH_SECRET || (process.env.NODE_ENV === "production" ? "" : "rcw-local-dev");
+  if (!secret) throw new Error("AUTH_SECRET is not set");
   return createHmac("sha256", secret).update(`rcw:${accessCode()}`).digest("hex");
 }
 
@@ -24,7 +28,8 @@ function same(a: string, b: string): boolean {
 }
 
 export function codeMatches(code: string): boolean {
-  return same(code.replace(/\s+/g, ""), accessCode());
+  const want = accessCode();
+  return want.length > 0 && same(code.replace(/\s+/g, ""), want);
 }
 
 export function sessionToken(): string {

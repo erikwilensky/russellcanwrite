@@ -133,7 +133,7 @@ export function WarRoom({ state, bank, onSignOut }: { state: SaveState; bank: nu
 
       {best.length > 0 && (
         <div className={s.panel} style={{ marginTop: 16 }}>
-          <h2 className={`${s.head} ${s.h3}`}>Best paragraphs (to show Mr Jasina)</h2>
+          <h2 className={`${s.head} ${s.h3}`}>Best paragraphs (to show your teacher)</h2>
           {best.map((b) => (
             <div key={b.id} style={{ marginBottom: 14 }}>
               <div>

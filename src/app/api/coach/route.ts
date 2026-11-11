@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { rcwSignedIn } from "@/lib/auth";
 import { analyse, type Gauges } from "@/lib/analyse";
 import { DISPATCHES } from "@/lib/content";
+import { costOf, MAX_OUTPUT_TOKENS, mayCall, readSpend, serial, withCall, worstCaseCall, writeSpend } from "@/lib/spend";
 
 type CoachQuestion = { quote: string; question: string };
 
@@ -42,45 +43,58 @@ export async function POST(req: Request) {
   }
 
   const rules = analyse(text);
+  const fallback = (note = "") =>
+    NextResponse.json({ ok: true, source: "rules", gauges: rules.gauges, questions: [], praise: "", note });
   const key = process.env.OPENAI_API_KEY?.trim();
-  const client = key ? new OpenAI({ apiKey: key }) : null;
-  if (!client) {
-    return NextResponse.json({ ok: true, source: "rules", gauges: rules.gauges, questions: [], praise: "" });
-  }
-  try {
-    const response = await client.chat.completions.create({
-      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: SYSTEM },
-        {
-          role: "user",
-          content: `Source: ${dispatch.source}\nQuestion: ${dispatch.question}\n\nRussell's paragraph:\n${text}`,
-        },
-      ],
-    });
-    const raw = JSON.parse(response.choices[0]?.message?.content ?? "{}") as {
-      gauges?: Partial<Gauges>;
-      questions?: Array<Partial<CoachQuestion>>;
-      praise?: unknown;
-    };
-    const g = raw.gauges ?? {};
-    const gauges: Gauges = {
-      sentences: clamp(g.sentences),
-      topic: clamp(g.topic),
-      peal: clamp(g.peal),
-      words: clamp(g.words),
-    };
-    // Keep only questions whose quote really is in his text, so a highlight always lands.
-    const questions = (raw.questions ?? [])
-      .filter((q): q is CoachQuestion => typeof q.quote === "string" && typeof q.question === "string")
-      .filter((q) => text.includes(q.quote))
-      .slice(0, 3);
-    const praise = typeof raw.praise === "string" ? raw.praise.slice(0, 300) : "";
-    return NextResponse.json({ ok: true, source: "ai", gauges, questions, praise });
-  } catch (err) {
-    console.error("[rcw] coach failed", err);
-    return NextResponse.json({ ok: true, source: "rules", gauges: rules.gauges, questions: [], praise: "" });
-  }
+  if (!key) return fallback();
+  const model = process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini";
+  // No automatic retries: every request that reaches OpenAI is counted against the cap.
+  const client = new OpenAI({ apiKey: key, maxRetries: 0, timeout: 30_000 });
+
+  return serial(async () => {
+    const log = await readSpend();
+    if (!mayCall(log, model)) return fallback("The AI coach has used its budget for now. The built-in marker scored this.");
+    let spent = worstCaseCall(model);
+    try {
+      const response = await client.chat.completions.create({
+        model,
+        temperature: 0.2,
+        max_completion_tokens: MAX_OUTPUT_TOKENS,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM },
+          {
+            role: "user",
+            content: `Source: ${dispatch.source}\nQuestion: ${dispatch.question}\n\nRussell's paragraph:\n${text}`,
+          },
+        ],
+      });
+      if (response.usage) spent = costOf(model, response.usage.prompt_tokens, response.usage.completion_tokens);
+      const raw = JSON.parse(response.choices[0]?.message?.content ?? "{}") as {
+        gauges?: Partial<Gauges>;
+        questions?: Array<Partial<CoachQuestion>>;
+        praise?: unknown;
+      };
+      const g = raw.gauges ?? {};
+      const gauges: Gauges = {
+        sentences: clamp(g.sentences),
+        topic: clamp(g.topic),
+        peal: clamp(g.peal),
+        words: clamp(g.words),
+      };
+      // Keep only questions whose quote really is in his text, so a highlight always lands.
+      const questions = (raw.questions ?? [])
+        .filter((q): q is CoachQuestion => typeof q.quote === "string" && typeof q.question === "string")
+        .filter((q) => text.includes(q.quote))
+        .slice(0, 3);
+      const praise = typeof raw.praise === "string" ? raw.praise.slice(0, 300) : "";
+      return NextResponse.json({ ok: true, source: "ai", gauges, questions, praise });
+    } catch (err) {
+      console.error("[rcw] coach failed", err instanceof Error ? err.message : "unknown error");
+      return fallback();
+    } finally {
+      // A failed call is counted at its worst case, so errors can never let spending slip past the cap.
+      await writeSpend(withCall(log, spent)).catch((e) => console.error("[rcw] spend log not saved", e));
+    }
+  });
 }

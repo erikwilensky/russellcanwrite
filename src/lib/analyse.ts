@@ -51,7 +51,10 @@ const OPENER_WORDS = [
   "ultimately",
 ];
 const SPLICE_SUBJECT =
-  /,\s+(it|this|they|he|she|these|we|i|there is|there are|the reader|the audience|the viewer|readers|the poster|the image|the layout|the slogan|the text|the advert|the advertisement|the source|the photo|the map|the army|the soldiers|the fleet|the enemy)\s+(?!who\b|which\b|that\b)[a-z]+/gi;
+  /,\s+(it|this|they|he|she|these|we|i|there is|there are|the reader|the audience|the viewer|readers|the poster|the image|the layout|the slogan|the text|the advert|the advertisement|the source|the photo|the map|the army|the soldiers|the fleet|the enemy|the [a-z]+(?=\s+(?:is|are|was|were|has|have|had|shows?|makes?|uses?|gives?|creates?|suggests?|represents?)\b))\s+(?!who\b|which\b|that\b)[a-z]+/gi;
+
+const OPENER_START =
+  /^(in|on|at|throughout|across|within|overall|additionally|furthermore|moreover|however|first|firstly|secondly|finally|also|then|from|by|with|without|during|after|before|under|above|below|beside|behind|near|next|meanwhile|here|today|later|soon|instead)$/i;
 
 const WORD_RULES: Array<{ re: RegExp; note: string }> = [
   { re: /\bthere\s+(own|head|heads|beliefs?|choices?|awareness|environmental|actions?|views?|minds?|lives|homes?|families|horses|army|armies|ships?|leaders?)\b/i, note: "'there' should be 'their' (belonging to them)" },
@@ -98,7 +101,12 @@ export function analyse(text: string): Analysis {
       }
     }
     SPLICE_SUBJECT.lastIndex = 0;
-    const splice = SPLICE_SUBJECT.exec(s);
+    let splice = SPLICE_SUBJECT.exec(s);
+    // "In the top left of the poster, the colours are..." is an opener plus one sentence, not a splice.
+    if (splice) {
+      const before = s.slice(0, splice.index).trim().split(/\s+/);
+      if (OPENER_START.test(before[0] ?? "") && before.length <= 8) splice = null;
+    }
     const startsWithSub = /^(although|because|when|while|if|as|since|after|before|unless|whereas|though)\b/i.test(s);
     if (!isRunOn && splice && !startsWithSub && n > 12) {
       flags.push({ sentence: i, kind: "run-on", note: `Is "${splice[0].replace(/^,\s+/, "")}…" the start of a new sentence? Read it aloud and listen for the stop.` });
