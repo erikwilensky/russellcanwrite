@@ -15,13 +15,6 @@ function accessCode(): string {
   return process.env.NODE_ENV === "production" ? "" : "00000000";
 }
 
-/** Optional second code for a guest (e.g. Russell's teacher): every task open, nothing saved, no AI. */
-function guestCode(): string {
-  const set = process.env.RCW_GUEST_CODE?.trim();
-  if (set) return set;
-  return process.env.NODE_ENV === "production" ? "" : "11111111";
-}
-
 export type Role = "russell" | "guest";
 
 function secret(): string {
@@ -31,7 +24,8 @@ function secret(): string {
 }
 
 function token(role: Role = "russell"): string {
-  const material = role === "guest" ? `rcw-guest:${guestCode()}` : `rcw:${accessCode()}`;
+  // Guests (the "Look around as a guest" button, e.g. Russell's teacher) need no code.
+  const material = role === "guest" ? "rcw-guest" : `rcw:${accessCode()}`;
   return createHmac("sha256", secret()).update(material).digest("hex");
 }
 
@@ -45,14 +39,10 @@ export function codeMatches(code: string): boolean {
   return roleForCode(code) === "russell";
 }
 
-/** Which role a typed code opens. Russell's code wins if the two are ever set the same. */
+/** A typed code opens Russell's game or nothing. Guests come in through the guest button instead. */
 export function roleForCode(code: string): Role | null {
-  const c = code.replace(/\s+/g, "");
   const main = accessCode();
-  if (main && same(c, main)) return "russell";
-  const guest = guestCode();
-  if (guest && same(c, guest)) return "guest";
-  return null;
+  return main && same(code.replace(/\s+/g, ""), main) ? "russell" : null;
 }
 
 export function sessionToken(role: Role = "russell"): string {
@@ -64,7 +54,7 @@ export async function rcwRole(): Promise<Role | null> {
   const v = jar.get(RCW_COOKIE)?.value;
   if (!v) return null;
   if (same(v, token("russell"))) return "russell";
-  if (guestCode() && same(v, token("guest"))) return "guest";
+  if (same(v, token("guest"))) return "guest";
   return null;
 }
 

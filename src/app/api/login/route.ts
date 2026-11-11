@@ -1,18 +1,23 @@
 import { NextResponse } from "next/server";
-import { noteFailedAttempt, roleForCode, RCW_COOKIE, sessionToken, tooManyAttempts } from "@/lib/auth";
+import { noteFailedAttempt, type Role, roleForCode, RCW_COOKIE, sessionToken, tooManyAttempts } from "@/lib/auth";
 
 export async function POST(req: Request) {
+  const body = (await req.json().catch(() => ({}))) as { code?: unknown; guest?: unknown };
+  if (body.guest === true) return signIn("guest");
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "local";
   if (tooManyAttempts(ip)) {
     return NextResponse.json({ ok: false, error: "Too many tries. Wait ten minutes." }, { status: 429 });
   }
-  const body = (await req.json().catch(() => ({}))) as { code?: unknown };
   const code = typeof body.code === "string" ? body.code : "";
   const role = roleForCode(code);
   if (!role) {
     noteFailedAttempt(ip);
     return NextResponse.json({ ok: false, error: "Wrong code." }, { status: 401 });
   }
+  return signIn(role);
+}
+
+function signIn(role: Role) {
   const res = NextResponse.json({ ok: true, role });
   res.cookies.set(RCW_COOKIE, sessionToken(role), {
     httpOnly: true,

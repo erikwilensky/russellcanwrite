@@ -208,13 +208,14 @@
 }
 
 .gateCard {
+  box-sizing: border-box;
   width: 100%;
   max-width: 420px;
   text-align: center;
 }
 
 .gateTitle {
-  font-size: 40px;
+  font-size: clamp(28px, 9vw, 40px);
   line-height: 1.05;
   color: var(--gold);
   margin: 0 0 4px;
@@ -228,7 +229,9 @@
 }
 
 .codeCell {
-  width: 38px;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 38px;
   height: 50px;
   border-radius: 8px;
   border: 1px solid var(--line);
@@ -807,4 +810,14 @@
   border-radius: 10px;
   font-size: 0.9rem;
   line-height: 1.4;
+}
+
+.guestEntry {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: center;
 }

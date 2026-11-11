@@ -11,6 +11,27 @@ export function RcwGate() {
   const [shake, setShake] = useState(0);
   const [busy, setBusy] = useState(false);
 
+  async function enterAsGuest() {
+    setBusy(true);
+    setErr("");
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ guest: true }),
+      });
+      if (res.ok) {
+        window.location.reload();
+        return;
+      }
+      setErr("Could not open the guest view.");
+    } catch {
+      setErr("No connection.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submit(c: string) {
     setBusy(true);
     setErr("");
@@ -89,6 +110,14 @@ export function RcwGate() {
             {err}
           </p>
         )}
+        <div className={s.guestEntry}>
+          <button type="button" className={s.ghost} onClick={enterAsGuest} disabled={busy}>
+            Look around as a guest
+          </button>
+          <p className={`${s.small} ${s.muted}`} style={{ margin: 0 }}>
+            For teachers and visitors: try every task. Nothing is saved.
+          </p>
+        </div>
       </div>
     </div>
   );
